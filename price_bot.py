@@ -1,11 +1,11 @@
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 import pandas as pd
 import json
 import re
 import os
 import gdown
-import asyncio
 
 # 🔗 Google Drive файл (Excel)
 GDRIVE_LINK = "https://drive.google.com/uc?id=1BVD0nAZoj5Ug2y3bytqfRwWRQp2P8hA2"
@@ -36,7 +36,8 @@ allowed_users = load_users()
 # 📍 /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg = f"👋 Привіт, {update.effective_user.first_name}!\nВаш Telegram ID: {user_id}"
+    msg = f"👋 Привіт, {update.effective_user.first_name}!
+Ваш Telegram ID: {user_id}"
     keyboard = [[InlineKeyboardButton("🔎 Зробити запит", callback_data="make_query")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(msg, reply_markup=reply_markup)
@@ -50,7 +51,8 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔ У вас немає прав на цю команду.")
         return
-    await update.message.reply_text("👥 Список дозволених ID:\n" + "\n".join(str(uid) for uid in allowed_users))
+    await update.message.reply_text("👥 Список дозволених ID:
+" + "\n".join(str(uid) for uid in allowed_users))
 
 # 📍 /admin add
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,7 +62,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
     if len(args) != 2 or args[0] != "add":
-        await update.message.reply_text("⚙️ Формат:\n/admin add 123456789")
+        await update.message.reply_text("⚙️ Формат:
+/admin add 123456789")
         return
 
     try:
@@ -79,7 +82,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "make_query":
-        await query.message.reply_text("📌 Введіть запит у форматі:\nVRP350/VRP 350/VRP-350, січень-грудень 2024")
+        await query.message.reply_text("📌 Введіть запит у форматі:
+VRP350/VRP 350/VRP-350, січень-грудень 2024")
 
 # 📊 Аналіз
 month_map = {
@@ -112,6 +116,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_date = pd.to_datetime(f"1 {month_start_en} {year}", dayfirst=True)
     end_date = pd.to_datetime(f"1 {month_end_en} {year}", dayfirst=True) + pd.offsets.MonthEnd(0)
 
+    download_excel()
     xls = pd.ExcelFile(XLSX_FILE)
     rows = []
 
@@ -131,7 +136,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )]
 
         filtered = df_filtered[
-            (df_filtered["дата виписки"] >= start_date) & (df_filtered["дата виписки"] <= end_date)
+            (df_filtered["дата виписки"] >= start_date) &
+            (df_filtered["дата виписки"] <= end_date)
         ]
 
         if not filtered.empty:
@@ -156,23 +162,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(table, parse_mode="HTML")
 
-# 🌀 Асинхронний запуск без polling
-async def run_bot():
+# 🚀 Запуск
+def main():
     print("☁️ Завантаження Excel з Google Drive...")
     download_excel()
     print("✅ Бот запущено. Очікую повідомлень у Telegram...")
 
-    app = Application.builder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
+    app = ApplicationBuilder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(CommandHandler("users", list_users))
     app.add_handler(CommandHandler("admin", admin_command))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    await asyncio.Event().wait()
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(run_bot())
+    main()
