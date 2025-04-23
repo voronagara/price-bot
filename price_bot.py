@@ -1,4 +1,3 @@
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 import pandas as pd
@@ -36,8 +35,7 @@ allowed_users = load_users()
 # 📍 /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg = f"👋 Привіт, {update.effective_user.first_name}!
-Ваш Telegram ID: {user_id}"
+    msg = f"👋 Привіт, {update.effective_user.first_name}!\nВаш Telegram ID: {user_id}"
     keyboard = [[InlineKeyboardButton("🔎 Зробити запит", callback_data="make_query")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(msg, reply_markup=reply_markup)
@@ -51,8 +49,7 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔ У вас немає прав на цю команду.")
         return
-    await update.message.reply_text("👥 Список дозволених ID:
-" + "\n".join(str(uid) for uid in allowed_users))
+    await update.message.reply_text("👥 Список дозволених ID:\n" + "\n".join(str(uid) for uid in allowed_users))
 
 # 📍 /admin add
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,8 +59,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
     if len(args) != 2 or args[0] != "add":
-        await update.message.reply_text("⚙️ Формат:
-/admin add 123456789")
+        await update.message.reply_text("⚙️ Формат:\n/admin add 123456789")
         return
 
     try:
@@ -82,8 +78,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "make_query":
-        await query.message.reply_text("📌 Введіть запит у форматі:
-VRP350/VRP 350/VRP-350, січень-грудень 2024")
+        await query.message.reply_text("📌 Введіть запит у форматі:\nVRP350/VRP 350/VRP-350, січень-грудень 2024")
 
 # 📊 Аналіз
 month_map = {
@@ -116,7 +111,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_date = pd.to_datetime(f"1 {month_start_en} {year}", dayfirst=True)
     end_date = pd.to_datetime(f"1 {month_end_en} {year}", dayfirst=True) + pd.offsets.MonthEnd(0)
 
-    download_excel()
     xls = pd.ExcelFile(XLSX_FILE)
     rows = []
 
