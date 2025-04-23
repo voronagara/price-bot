@@ -1,10 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 import pandas as pd
 import json
 import re
 import os
 import gdown
+import asyncio
 
 # 🔗 Google Drive файл (Excel)
 GDRIVE_LINK = "https://drive.google.com/uc?id=1BVD0nAZoj5Ug2y3bytqfRwWRQp2P8hA2"
@@ -130,8 +131,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )]
 
         filtered = df_filtered[
-            (df_filtered["дата виписки"] >= start_date) &
-            (df_filtered["дата виписки"] <= end_date)
+            (df_filtered["дата виписки"] >= start_date) & (df_filtered["дата виписки"] <= end_date)
         ]
 
         if not filtered.empty:
@@ -156,20 +156,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(table, parse_mode="HTML")
 
-# 🚀 Запуск
-def main():
+# 🌀 Асинхронний запуск без polling
+async def run_bot():
     print("☁️ Завантаження Excel з Google Drive...")
     download_excel()
     print("✅ Бот запущено. Очікую повідомлень у Telegram...")
 
-    app = ApplicationBuilder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
+    app = Application.builder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(CommandHandler("users", list_users))
     app.add_handler(CommandHandler("admin", admin_command))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.run_polling()
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(run_bot())
