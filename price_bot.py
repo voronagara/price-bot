@@ -4,49 +4,54 @@ import pandas as pd
 import json
 import re
 import os
+import gdown
 
-# 🔐 ID головного адміністратора (твій)
+# 🔗 Google Drive файл (Excel)
+GDRIVE_LINK = "https://drive.google.com/uc?id=1BVD0nAZoj5Ug2y3bytqfRwWRQp2P8hA2"
+XLSX_FILE = "svodna_tablycya.xlsx"
+
+# 📥 Завантаження Excel-файлу з Google Drive
+def download_excel():
+    if os.path.exists(XLSX_FILE):
+        os.remove(XLSX_FILE)
+    gdown.download(GDRIVE_LINK, XLSX_FILE, quiet=False)
+
+# 🔐 Адмін
 ADMIN_ID = 339950143
-
-# 📁 Файл зі списком дозволених користувачів
 USERS_FILE = "allowed_users.json"
 
-# 📥 Завантаження списку користувачів
 def load_users():
     if not os.path.exists(USERS_FILE):
         return []
     with open(USERS_FILE, "r") as f:
         return json.load(f)
 
-# 💾 Збереження користувачів
 def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
 allowed_users = load_users()
 
-# 📍 /start – показ ID + кнопка
+# 📍 /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     msg = f"👋 Привіт, {update.effective_user.first_name}!\nВаш Telegram ID: {user_id}"
-
     keyboard = [[InlineKeyboardButton("🔎 Зробити запит", callback_data="make_query")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(msg, reply_markup=reply_markup)
 
 # 📍 /id
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Ваш Telegram ID: {update.effective_user.id}")
 
-# 📍 /users – показує список дозволених
+# 📍 /users
 async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔ У вас немає прав на цю команду.")
         return
     await update.message.reply_text("👥 Список дозволених ID:\n" + "\n".join(str(uid) for uid in allowed_users))
 
-# 📍 /admin add [id]
+# 📍 /admin add
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("⛔ У вас немає прав на цю команду.")
@@ -54,7 +59,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
     if len(args) != 2 or args[0] != "add":
-        await update.message.reply_text("⚙️ Формат:\n/admin add 123456789\nабо\n/admin list")
+        await update.message.reply_text("⚙️ Формат:\n/admin add 123456789")
         return
 
     try:
@@ -62,26 +67,25 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if new_id not in allowed_users:
             allowed_users.append(new_id)
             save_users(allowed_users)
-            await update.message.reply_text(f"✅ Користувача {new_id} додано до дозволених.")
+            await update.message.reply_text(f"✅ Користувача {new_id} додано.")
         else:
-            await update.message.reply_text(f"ℹ️ Користувач {new_id} вже у списку.")
+            await update.message.reply_text(f"ℹ️ Користувач {new_id} вже є.")
     except ValueError:
         await update.message.reply_text("❗ ID має бути числом.")
 
-# 🔘 Кнопка "Зробити запит"
+# 🔘 Кнопка
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "make_query":
         await query.message.reply_text("📌 Введіть запит у форматі:\nVRP350/VRP 350/VRP-350, січень-грудень 2024")
 
-# 📊 Обробка запиту
+# 📊 Аналіз
 month_map = {
     "січень": "January", "лютий": "February", "березень": "March", "квітень": "April",
     "травень": "May", "червень": "June", "липень": "July", "серпень": "August",
     "вересень": "September", "жовтень": "October", "листопад": "November", "грудень": "December"
 }
-xls = pd.ExcelFile("svodna_tablycya.xlsx")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -107,7 +111,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_date = pd.to_datetime(f"1 {month_start_en} {year}", dayfirst=True)
     end_date = pd.to_datetime(f"1 {month_end_en} {year}", dayfirst=True) + pd.offsets.MonthEnd(0)
 
+    xls = pd.ExcelFile(XLSX_FILE)
     rows = []
+
     for sheet in xls.sheet_names:
         df = pd.read_excel(xls, sheet_name=sheet)
         df.columns = [c.lower().strip() for c in df.columns]
@@ -152,7 +158,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🚀 Запуск
 def main():
+    print("☁️ Завантаження Excel з Google Drive...")
+    download_excel()
     print("✅ Бот запущено. Очікую повідомлень у Telegram...")
+
     app = ApplicationBuilder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("id", get_id))
