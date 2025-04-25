@@ -9,14 +9,25 @@ import gdown
 # 🔗 Google Drive файл (Excel)
 GDRIVE_LINK = "https://drive.google.com/uc?id=1BVD0nAZoj5Ug2y3bytqfRwWRQp2P8hA2"
 XLSX_FILE = "svodna_tablycya.xlsx"
+excel_data = {}
 
-# 📥 Завантаження Excel-файлу з Google Drive
 def download_excel():
     if os.path.exists(XLSX_FILE):
         os.remove(XLSX_FILE)
     gdown.download(GDRIVE_LINK, XLSX_FILE, quiet=False)
 
-# 🔐 Адмін
+def load_excel_to_memory():
+    xls = pd.ExcelFile(XLSX_FILE)
+    data = {}
+    for sheet in xls.sheet_names:
+        df = pd.read_excel(xls, sheet_name=sheet)
+        df.columns = [c.lower().strip() for c in df.columns]
+        if "номенклатура товарів/послуг" in df.columns and "дата виписки" in df.columns:
+            df["дата виписки"] = pd.to_datetime(df["дата виписки"], errors="coerce")
+            data[sheet] = df
+    return data
+
+# 🔐 Адмін і користувачі
 ADMIN_ID = 339950143
 USERS_FILE = "allowed_users.json"
 
@@ -77,8 +88,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == "make_query":
-        await query.message.reply_text("📌 Введіть запит у форматі:\nVRP350/VRP 350/VRP-350, січень-грудень 2024")
+    await query.message.reply_text("📌 Введіть запит:\n➤ Артикул (наприклад: 3364150)\n➤ Або з періодом: VRP350/VRP 350/VRP-350, січень-грудень 2024")
 
 # 📊 Аналіз
 month_map = {
@@ -87,6 +97,9 @@ month_map = {
     "вересень": "September", "жовтень": "October", "листопад": "November", "грудень": "December"
 }
 
+def normalize(text):
+    return re.sub(r"[\s\-]", "", str(text)).lower()
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in allowed_users:
@@ -94,54 +107,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text.lower().replace("–", "-")
+
     match = re.match(r"(.+?),\s*(.+?)\s*-\s*(.+?)\s*(\d{4})", text)
-    if not match:
-        await update.message.reply_text("Формат запиту: VRP350/VRP 350/VRP-350, січень-грудень 2024")
-        return
+    if match:
+        raw_skus, month_start, month_end, year = match.groups()
+        sku_variants = [normalize(s) for s in raw_skus.split("/") if s.strip()]
+        month_start_en = month_map.get(month_start.strip())
+        month_end_en = month_map.get(month_end.strip())
 
-    raw_skus, month_start, month_end, year = match.groups()
-    sku_variants = [re.sub(r"[\s\-]", "", s).lower() for s in raw_skus.split("/") if s.strip()]
-    month_start_en = month_map.get(month_start.strip())
-    month_end_en = month_map.get(month_end.strip())
+        if not month_start_en or not month_end_en:
+            await update.message.reply_text("Не вдалося розпізнати місяці.")
+            return
 
-    if not month_start_en or not month_end_en:
-        await update.message.reply_text("Не вдалося розпізнати місяці.")
-        return
+        start_date = pd.to_datetime(f"1 {month_start_en} {year}", dayfirst=True)
+        end_date = pd.to_datetime(f"1 {month_end_en} {year}", dayfirst=True) + pd.offsets.MonthEnd(0)
+    else:
+        sku_variants = [normalize(s) for s in text.split("/") if s.strip()]
+        start_date, end_date = None, None
 
-    start_date = pd.to_datetime(f"1 {month_start_en} {year}", dayfirst=True)
-    end_date = pd.to_datetime(f"1 {month_end_en} {year}", dayfirst=True) + pd.offsets.MonthEnd(0)
-
-    xls = pd.ExcelFile(XLSX_FILE)
     rows = []
-
-    for sheet in xls.sheet_names:
-        df = pd.read_excel(xls, sheet_name=sheet)
-        df.columns = [c.lower().strip() for c in df.columns]
-        if "номенклатура товарів/послуг" not in df.columns or "дата виписки" not in df.columns:
-            continue
-
-        df["дата виписки"] = pd.to_datetime(df["дата виписки"], errors="coerce")
-
-        def normalize(text):
-            return re.sub(r"[\s\-]", "", str(text)).lower()
-
+    for sheet, df in excel_data.items():
         df_filtered = df[df["номенклатура товарів/послуг"].apply(
             lambda x: any(variant in normalize(x) for variant in sku_variants)
         )]
 
-        filtered = df_filtered[
-            (df_filtered["дата виписки"] >= start_date) &
-            (df_filtered["дата виписки"] <= end_date)
-        ]
+        if start_date and end_date:
+            df_filtered = df_filtered[
+                (df_filtered["дата виписки"] >= start_date) &
+                (df_filtered["дата виписки"] <= end_date)
+            ]
 
-        if not filtered.empty:
-            qty = int(filtered["кількість (об’єм , обсяг)"].sum())
-            avg = round(filtered["ціна з пдв"].mean(), 2)
-            total = round(filtered["сума з пдв"].sum(), 2)
+        if not df_filtered.empty:
+            qty = int(df_filtered["кількість (об’єм , обсяг)"].sum())
+            avg = round(df_filtered["ціна з пдв"].mean(), 2)
+            total = round(df_filtered["ціна з пдв"].sum(), 2)
             rows.append((sheet, qty, avg, total))
 
     if not rows:
-        await update.message.reply_text("Продажів не знайдено за цей період.")
+        await update.message.reply_text("Продажів не знайдено.")
         return
 
     rows.sort(key=lambda x: x[3], reverse=True)
@@ -160,7 +163,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     print("☁️ Завантаження Excel з Google Drive...")
     download_excel()
-    print("✅ Бот запущено. Очікую повідомлень у Telegram...")
+    global excel_data
+    excel_data = load_excel_to_memory()
+    print("✅ Excel завантажено в памʼять. Бот працює!")
 
     app = ApplicationBuilder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
     app.add_handler(CommandHandler("start", start))
