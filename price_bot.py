@@ -167,7 +167,7 @@ def main():
     excel_data = load_excel_to_memory()
     print("✅ Excel завантажено в пам'ять. Бот працює!")
 
-    app = ApplicationBuilder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
+    app = ApplicationBuilder().token("7762946339:AAGyH09Ty3eODo2SQTNW__ARZxshGo00NV8").build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(CommandHandler("users", list_users))
