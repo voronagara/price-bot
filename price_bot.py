@@ -46,7 +46,8 @@ allowed_users = load_users()
 # 📍 /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg = f"👋 Привіт, {update.effective_user.first_name}!\nВаш Telegram ID: {user_id}"
+    msg = f"👋 Привіт, {update.effective_user.first_name}!
+Ваш Telegram ID: {user_id}"
     keyboard = [[InlineKeyboardButton("🔎 Зробити запит", callback_data="make_query")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(msg, reply_markup=reply_markup)
@@ -88,7 +89,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.message.reply_text("📌 Введіть запит:\n➤ Артикул (наприклад: 3364150)\n➤ Або з періодом: VRP350/VRP 350/VRP-350, січень-грудень 2024")
+    await query.message.reply_text("📌 Введіть запит:\n➔ Артикул (3364150) \u0447и VRP350/VRP 350/VRP-350, січень-грудень 2024")
 
 # 📊 Аналіз
 month_map = {
@@ -140,32 +141,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not df_filtered.empty:
             qty = int(df_filtered["кількість (об’єм , обсяг)"].sum())
             avg = round(df_filtered["ціна з пдв"].mean(), 2)
-            total = round(df_filtered["ціна з пдв"].sum(), 2)
-            rows.append((sheet, qty, avg, total))
+            rows.append((sheet, qty, avg))
 
     if not rows:
         await update.message.reply_text("Продажів не знайдено.")
         return
 
-    rows.sort(key=lambda x: x[3], reverse=True)
+    rows.sort(key=lambda x: x[1], reverse=True)
     table = "📊 <b>Аналіз продажів</b>\n\n"
-    table += "<pre>{:<20} {:>10} {:>15} {:>17}</pre>\n".format("Постачальник", "Кількість", "Середня ціна", "Сума")
+    table += "<pre>{:<20} {:>10} {:>15}</pre>\n".format("Постачальник", "Кількість", "Середня ціна")
     for row in rows:
         name = row[0][:20]
         qty = f"{row[1]:,}".replace(",", " ")
         avg = f"{row[2]:,.2f}".replace(",", " ")
-        total = f"{row[3]:,.2f}".replace(",", " ")
-        table += "<pre>{:<20} {:>10} {:>15} {:>17}</pre>\n".format(name, qty, avg, total)
+        table += "<pre>{:<20} {:>10} {:>15}</pre>\n".format(name, qty, avg)
 
     await update.message.reply_text(table, parse_mode="HTML")
 
 # 🚀 Запуск
+
 def main():
     print("☁️ Завантаження Excel з Google Drive...")
     download_excel()
     global excel_data
     excel_data = load_excel_to_memory()
-    print("✅ Excel завантажено в памʼять. Бот працює!")
+    print("✅ Excel завантажено в пам'ять. Бот працює!")
 
     app = ApplicationBuilder().token("7762946339:AAHtXK5WV003LIPqaP3r3R6SrNginI8rthg").build()
     app.add_handler(CommandHandler("start", start))
