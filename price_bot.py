@@ -47,7 +47,7 @@ allowed_users = load_users()
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     msg = f"👋 Привіт, {update.effective_user.first_name}"!
-Ваш Telegram ID: {user_id}"
+msg = f"Ваш Telegram ID: {user_id}"
     keyboard = [[InlineKeyboardButton("🔎 Зробити запит", callback_data="make_query")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(msg, reply_markup=reply_markup)
