@@ -167,7 +167,7 @@ def main():
     print("✅ Excel завантажено в пам'ять. Бот працює!")
 
     import os
-app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(CommandHandler("users", list_users))
